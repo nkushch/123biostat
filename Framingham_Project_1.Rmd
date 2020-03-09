@@ -1,0 +1,507 @@
+---
+title: "Framingham Subset Project"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+author: "Nicholas Kushch"
+date: "9/4/2019"
+output: html_document
+subtitle: R Markdown Reports and ggplot Graphics
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(dslabs)
+library(tidyverse)
+library(tinytex)
+
+```
+
+# The Framingham Data
+
+The Framingham Heart Study is a longitudinal study that has been ongoing since 1948. It has provided information on the epidemiology of hypertension and cardiovascular disease. It started with 5,209 adults from Framingham, Massachusetts, and is currently on its third generation of subjects. 
+
+Common knowledge of the effects of diet, exercise and medication on heart disease has been found through this study. 
+
+"Original Cohort" requirements for entry into this study were age between 30 and 62 at time of first exam, without history of heart attack or stroke. Initially, healthcare workers volunteered for the study to set an example for patients, due to mild interest in the study. 
+
+In 1971, the "Offspring Cohort" was a second generation study of the children of the "Original Cohort". Spouses were also included and eligible if they had 2 or more children with the original participants.
+
+The "Generation Three Cohort" of 2002 was a third generation study of the children of the "Offspring Cohort". Minimum age of 20 for acceptance.
+
+There were two "Omni" cohorts (1 and 2). The first omni cohort (1994) looked at possible influences from race and heritage on heart risk. The second omni cohort (2003) was a shorter generational window of which children of the first omni cohort were studied. Due to the much shorter generational window, participants as young as 13 were eligible.
+
+The scope of this study is considered very useful, as over 3,000 peer-reviewed scientific papers have been published in relation to it's findings. The Framingham Study coined the term "risk factor" and gave doctors a sense of heart disease prevention. Treatments for high blood pressure and relationships between risk factors and health outcomes were found from this study. Some major findings include: 
+
+  * cigarette smoking, obesity, high cholesterol and high blood pressure, all
+  increase risk of heart disease, while exercise decreases this risk.
+  * high blood pressure increases risk of stroke
+  * high HDL cholesterol reduces risk of heart disease
+  * no evidence for a difference in health outcomes between filtered and
+  unfiltered cigarette use
+
+A subset of this data is being used. 
+
+```{r, warning=FALSE, message=FALSE, include=FALSE}
+library(LocalControl)
+library(tidyverse)
+
+framingham_df <- 
+  framingham %>% 
+  mutate(sex = ifelse(female == 1, yes = "Female", no = "Male")) %>% 
+  mutate(curSmoke = cursmoke == 1) %>% 
+  mutate(highBP = outcome == 1) %>% 
+  mutate(death = outcome == 2) %>% 
+  select(-female, -cursmoke, -outcome)
+
+```
+
+## BMI and Death
+
+```{r density function, echo=FALSE, warning=FALSE, message=FALSE}
+
+ggplot(data = framingham_df) +
+  
+  aes(x = bmi, fill = death) +
+  scale_fill_discrete(
+    "Dies or Survives", 
+    breaks = c("FALSE","TRUE"),
+    labels = c("Survives", "Dies")
+  ) +
+  labs(title = "BMI and Death", x = "BMI", y = "Frequency") +
+
+  geom_density() +
+  geom_vline(xintercept = 24.485) + 
+  geom_vline(xintercept = 24.580) +
+  
+  facet_wrap(~death)
+
+```
+
+The above shows a density function for two samples: the sample of subjects who died and the sample who survived, separated by BMI. BMI is on the x-axis, and frequency of subjects is on the y-axis. Median BMIs are marked by the vertical lines on each graph.
+
+I expected to see higher BMI associated with a clearly higher death rate, but the graphs do not readily display this. BMI is only slightly higher in the population that did not survive. 
+
+The modes of the death sample appear more identifiable at a slightly higher BMI, there are a few visible modes in the death population, suggesting that the death population could be made up of a few different groups.
+
+-------------------------------------------------------------------------------
+
+Median death BMI = 24.580, Median survive BMI = 24.485. 
+
+The following is the code I used to find median BMI values grouped by death (used for example above) and by high BP (used for the next graph).
+
+```{r find median values, results='hide', echo=TRUE}
+
+framingham_df %>% 
+  group_by(death) %>% 
+  summarise(med = median(bmi))
+
+```
+```{r find median valuesBP, results='hide', echo=TRUE}
+
+framingham_df %>% 
+  group_by(highBP) %>% 
+  summarise(med = median(bmi))
+```
+
+-------------------------------------------------------------------------------
+
+## BMI and Hypertension
+
+```{r stacked histogram BP, echo = FALSE}
+
+ggplot(data = framingham_df) +
+  
+  aes(x = bmi, fill = highBP) +
+  scale_fill_discrete(
+    "Hypertension", 
+    breaks=c("FALSE","TRUE"), 
+    labels=c("Normal", "Hypertension")
+  ) +
+  labs(title = "BMI and Hypertension", x = "BMI", y = "Frequency") +
+  
+  geom_histogram(bins = 8, binwidth = 0.50) +
+  geom_vline(xintercept = 23.875) + 
+  geom_vline(xintercept = 24.950) 
+  
+```
+
+The figure above is a stacked histogram of two samples: subjects with normal blood pressure levels, and subjects with hypertension. Median lines for BMI are marked with vertical lines.
+
+In this scenario, I also expected for the sample with higher blood pressure (hypertension) to present higher BMIs. While not abundantly clear in the histogram, the median lines present a visible difference. 
+Patients with high blood pressure have a higher median BMI (24.950) than patients with normal blood pressure (23.875).
+
+-------------------------------------------------------------------------------
+
+## Number of Cigarettes Smoked per Day and Death
+
+```{r cigpday_death, echo = FALSE}
+
+ggplot(data = framingham_df) +
+  
+  aes(x = death, y = cigpday, color = death) +
+  labs(title = "Cigarettes Smoked per Day and Death", 
+       y = "# Cigarettes smoked per day", 
+       x = "Survives or Dies"
+       ) +
+  
+  geom_jitter(position=position_jitter(width=.15, height=.05)) +
+  geom_boxplot(alpha = .5) +
+  coord_flip() 
+
+```
+
+This figure displays two samples: the red box plot is a sample of subjects who live, while the blue box plot is a sample of subjects who die. The x-axis displays # of cigarettes smoked per day. I also superimposed individual subjects as data points on the boxplot to more clearly display clusters of individuals.
+
+I expected for cigarette smokers to display a higher rate of death, and this expectation is supported by the figure:
+
+The "Deaths" box plot has a median of 10 cigarettes smoked per day, while the "Survives" box plot has a median of about 2 cigarettes smoked per day, with a large cluster of points between 0-2. The distribution of patients who "Live" is right-skewed. 
+
+-------------------------------------------------------------------------------
+
+## Number of Cigarettes Smoked per Day and BMI (by Sex)
+
+```{r cigpday bmi sex, echo = FALSE, message = FALSE}
+
+ggplot(data = framingham_df) +
+  
+  aes(x = bmi, y = cigpday, color = sex) +
+  labs(title = "Number of Cigarettes Smoked per Day and BMI (by Sex)", 
+        x = "BMI (Body Mass Index)",
+        y = "# Cigarettes Smoked per Day"
+       ) +
+  
+  geom_point(alpha = 0.1) +
+  geom_jitter(width = .05, height =2) +
+  geom_smooth(color = "black") +
+  
+  facet_wrap(~sex) 
+  
+```
+
+The scatterplots above display females on the left, in red, and males on the right, in blue. BMI is on the x-axis, and # of cigarettes smoked per day is displayed on the y-axis. The lines display overall trend in each scatterplot.
+
+I expected # of cigarettes smoked per day to increase as BMI increased, as I thought there may be a comorbidity of unhealthy lifestyle habits. I also expected men to smoke more cigarettes on average than women, due to a stronger cultural acceptance of men smoking than women.
+
+The figures actually display an overall downward trend of # cigarettes smoked per day with BMI. As BMI increases, # of cigarettes smoked per day appears to decrease for both men and women. Men tend to smoke more cigarettes per day than women, as expected, shown by more clusters of points higher in the graph for men.
+
+-------------------------------------------------------------------------------
+
+## BMI and Number of Cigarettes per Day
+
+```{r bmi cigpday, echo = FALSE, message = FALSE}
+
+ggplot(data = framingham_df) +
+  
+  aes(x = bmi, y = cigpday) +
+  labs(title = "BMI and Number of Cigarettes per Day", 
+       x = "BMI (Body Mass Index)",
+       y = "# Cigarettes Smoked per Day"
+       ) +
+  
+  geom_point(alpha = 0.10) +
+  geom_jitter(width = 1, height =.25) +
+  geom_smooth(aes(color = sex))
+  
+```
+
+This scatterplot displays the relationship between BMI and # cigarettes smoked per day on the same figure (not separated by sex). I included the lines of fit for men and women separately. Again, BMI is displayed on the x-axis and # cigarettes smoked per day is displayed on the y-axis.
+
+I had expected to see an increase in BMI associated with an increase in # cigarettes smoked per day. However, as also shown in the previous graph, the lines of fit suggest the opposite relationship. 
+
+When the points for men and women are combined, it is even more difficult to discern a relationship between BMI and cigarettes smoked per day overall. The lines of fit help to display this possible relationship.
+
+-------------------------------------------------------------------------------
+
+## Heart Rate and BMI by Smoking within Sex
+
+```{r heart rate and BMI by smoking within sex, echo = FALSE, message = FALSE}
+
+ggplot(data = framingham_df) + 
+  
+  aes(x = bmi, y = heartrte, color = sex, shape = curSmoke) +
+  labs(title = "Heart Rate and BMI by Smoking within Sex", 
+       x = "BMI (Body Mass Index)",
+       y = "Heart Rate (bpm)"
+       ) +
+  
+  geom_point(alpha = 0.2) +
+  geom_smooth(color = "black") +
+  geom_jitter(alpha = 0.1) +
+  
+  facet_wrap(~sex~curSmoke) 
+  
+```
+
+This figure displays heart rate on the y-axis and bmi on the x-axis. It is separated by sex (females are red, males are blue), and by smoking status. "False" represents nonsmokers and "True" represents current smokers.
+
+<!-- It separates the sample into 4 groups: -->
+
+1. The top left: Non-smoker Females
+2. The top right: Smoker Females
+3. The bottom left: Non-smoker Males
+4. The bottom right: Smoker Males
+  
+I expected to see heart rate increase with bmi for each group, supporting the notion that a higher bmi is associated with less healthy heart rate.
+
+There do not seem to be strong relationships between BMI and heart rate within men and women/smokers and non smokers displayed in the figure. This may suggest that BMI is not the best predictor of heart rate. BMI, as a measurement is quite limited: it does not take into consideration different body types. 
+
+For example, a highly active body builder may have a higher than average BMI, but this does not account for the builder's body composition-- being active and mostly composed of muscles, his/her bodyweight may be misrepresentative of his/her heart rate.
+
+-------------------------------------------------------------------------------
+
+# GapMinder World Health Data
+
+The following Data is from the Gapminder Foundation. This organization is a non-profit group originating in Stockholm, Sweden. It's goals are to promote sustainable global development, and to achieve UN Millennium Development goals through an increased use/understanding of global statistics. 
+
+Part of Gapminder Foundation's mission statement includes: protection and free dissemination of development results. This openness will allow us to work with subsets of their database.
+
+The database includes information about social, economic, and environmental development at local, national and global levels. The data subset being used includes data from 1960 to present for all countries of the world. The more recent years have more complete data. 
+Specifically, we will be looking at GDPperCap, life expectancy, infant mortality rates, and population over time, for several countries.
+
+```{r, warning=FALSE, include = FALSE}
+
+gapminder_df <- as_tibble(gapminder) %>% 
+  mutate(gdpPerCap = gdp / population)
+
+```
+
+-------------------------------------------------------------------------------
+
+## Most Recent Bubble Chart with Complete Data: 2009
+
+```{r 2009 bubble, echo = FALSE, warning = FALSE}
+ggplot(data = filter(gapminder_df, year == 2011)) +
+  
+  theme(legend.position = "top") +
+  aes(x = gdpPerCap, y = life_expectancy, 
+      color = continent, size = (population)
+      ) +
+  labs(title = "Life Expectancy and GDP Per Cap by Country, 2011",  
+       x = "GDP per Cap USD, log scale", 
+       y = "Life Expectancy (years)"
+       ) +
+  
+  scale_size(range = c(0.1, 20), guide = "none") +
+  scale_x_log10(limits = c(200, 80000), 
+                breaks = c(500, 1000, 2500, 5000, 
+                          10000, 20000, 30000, 50000)
+                ) +
+  geom_point(alpha = 0.5)
+  
+```
+
+This figure above shows life expectancy on the y-axis and GDP per cap (log scale) on the x-axis. The size of the points represents the size of the country's population: larger points denote a country with a larger population. The countries are also color-coded by continent, as displayed in the legend.
+
+The general trend, as expected, is clear: the more money a person makes, the higher their life expectancy. India and China stand out as two larger circles in Asia (green). Countries in Europe and the Americas are located in the upper right (indicating a higher life expectancy and higher GDP per Cap). Asian and Oceanic countries are more distributed in the center (around average life expectanct and GDP per Cap). African countries have the lowest GDP per cap and life expectancies on average.
+
+-------------------------------------------------------------------------------
+
+## Bubble Charts over Time
+
+```{r bubbles 3 diff years, echo = FALSE, warning = FALSE}
+
+# 1970
+ggplot(data = filter(gapminder_df, year == 1970)) +
+  
+  theme(legend.position = "top") +
+  aes(x = gdpPerCap, y = life_expectancy, 
+      color = continent, size = population
+      ) +
+  labs(title = "Life Expectancy and GDP Per Cap by Country, 1970", 
+       x = "GDP per Cap USD, log scale", 
+       y = "Life Expectancy (years)"
+       ) +
+  
+  ylim(c(40, 90)) +
+  scale_size(range = c(0.1, 20), guide = "none") +
+  scale_x_log10(limits = c(200, 80000), 
+                breaks = c(500, 1000, 2500, 5000, 
+                           10000, 20000, 30000, 50000)
+                ) +
+  geom_point(alpha = 0.5)
+  
+# 1990
+ggplot(data = filter(gapminder_df, year == 1990)) +
+  
+  theme(legend.position = "top") +
+  aes(x = gdpPerCap, y = life_expectancy, 
+      color = continent, size = population
+      ) +
+  labs(title = "Life Expectancy and GDP Per Cap by Country, 1990",  
+       x = "GDP per Cap USD, log scale", 
+       y = "Life Expectancy (years)"
+       ) +
+
+  ylim(c(40, 90)) +
+  scale_size(range = c(0.1, 20), guide = "none") +
+  scale_x_log10(limits = c(200, 80000), 
+                breaks = c(500, 1000, 2500, 5000, 
+                          10000, 20000, 30000, 50000)
+                ) +
+  geom_point(alpha = 0.5) 
+  
+  
+# 2011  
+ggplot(data = filter(gapminder_df, year == 2011)) +
+  
+  theme(legend.position = "top") +
+  aes(x = gdpPerCap, y = life_expectancy, 
+      color = continent, size = population
+      ) +
+  labs(title = "Life Expectancy and GDP Per Cap by Country, 2011", 
+       x = "GDP per Cap USD, log scale",
+       y = "Life Expectancy (years)"
+       ) +
+
+  ylim(c(40, 90)) +
+  scale_size(range = c(0.1, 20), guide = "none") +
+  scale_x_log10(limits = c(200, 80000), 
+                breaks = c(500, 1000, 2500, 5000, 
+                           10000, 20000, 30000, 50000)
+                ) +
+  geom_point(alpha = 0.5) 
+  
+```
+
+These three figures display the same information as the first Life Expectancy/GDPperCap by Country figure, except at three different points in time: 1970, 1990 and 2011. 
+
+Again, the points being countries, are color-coded by continent as displayed in the legend, and the size of the points is determined by population of the country. X-axis is GDP perCap (logscale) and Y-axis is life-expectancy.
+
+By setting a limit on the y axes, we are able to see the movement of points over time. Countries clearly tend to live longer lives on average, as the points are moving upwards on the y axis (life expectancy). They also seem to be moving to the right too, suggesting that countries also have a higher GDP on average.
+
+The countries shifting up and to the right the most in this interval of time appear to be the Asian countries. Specifically, China and India, denoted by the largest 2 green ponints, moved from having GDPperCaps more typical of African countries, to the center of the distribution. 
+
+Additionally, the scatter of the points appears to be getting tighter around a more linear relationship over time. This may be due to more data being collected in more recent years.
+
+-------------------------------------------------------------------------------
+
+## The Growth Chart
+
+### GDP per Capita
+
+```{r GDP per Cap 2, echo = FALSE, warning = FALSE}
+
+ggplot(data = filter(gapminder_df, 
+                     country == c("China","Russia","United States","India")
+                     )
+       ) +
+  
+  aes(x = year, y = gdpPerCap, color = country) +
+  labs(title = "GDP per Capita over Time", 
+       x = "Year",
+       y = "GDP Per Capita USD (logscale)",
+       color = "Countries") +
+
+  geom_line() +
+  scale_y_log10()
+   
+```
+
+This figure displays year on the x-axis, GDP per Cap (logscale) on the y-axis, and shows lines in different colors for different countries, as denoted in the legend.
+
+The United States, China, and India all exhibit steady growth in GDP over time from 1960 to present day based on the available data. At around 1978, China surpassed India in GDP. 
+
+here is no available data for Russia's GDP before the year 1989, likely because of the Soviet Union's control of national information. After the dissolution of the Soviet Union, the statistics were made available, showing a decline in GDP from 1990 to 1998 before beginning to grow again.
+
+-------------------------------------------------------------------------------
+
+### Infant Mortality
+
+```{r infmort2, echo = FALSE, warning = FALSE}
+
+ggplot(data = filter(gapminder_df, 
+                     country == c("China", "Russia", "United States", "India")
+                    )
+       ) +
+  
+  aes(x = year, y = infant_mortality, color = country) +
+  labs(title = "Infant Mortality over Time",
+        x = "Year",
+        y = "Infant mortality (deaths per 1000 live births)",
+        color = "Countries") +
+  
+  geom_line() 
+    
+```
+
+The x-axis of this figure is year, and the y-axis shows infant mortality rate (deaths/1000 live births). Again, countries are denoted by different colors, explained in the legend.
+
+All countries experienced a decline in infant mortality rates from 1960 to present day. While all 4 countries are declining, India's infant mortality rate is higher in most recent data. China, Russia and the United States' rates have converged at approximately 10/1000 live births, while India's is about 40/1000 live births.
+
+There is data missing from around 1963 to 1970 for China, and data missing from 1960 to 1970 for Russia. This is likely due to government control of information during these times. Perhaps China was hiding stats during implementation of the One Child Policy, and Russia's government was closed off during communist regime.
+
+The data available data from 1960 - 1963 for China shows a rapid decline in mortality rate, one of much steeper slope than any other trend. There is a plateau in infant mortality rate for both China and Russia in the late 80s/90s.
+
+-------------------------------------------------------------------------------
+
+## Rank Charts
+
+### Population Rank by GDP/Capita
+
+```{r poprank by gdppercap, echo = FALSE}
+
+# created subset of data to make graph more readable
+gdppercap_df <- (gapminder_df %>%
+  filter(year == 2009) %>% 
+  arrange(desc(population)) %>% 
+  slice(1:35))
+
+ggplot(data = gdppercap_df) +
+  
+  aes(x = reorder(country, population), 
+      y = population, 
+      fill = gdpPerCap) +
+  scale_fill_continuous("GdpPerCap", type = "viridis") +
+  labs(title = "Population Rank by GDP/Capita 2009", 
+       x = "Country", 
+       y = "Population",
+       fill = "GDPperCap") +
+  
+  geom_bar(stat = "identity") + 
+  coord_flip() 
+
+  
+## note to self: If you want the heights of the bars to represent values in the data, use stat="identity" and map a value to the y aesthetic.
+```
+
+The above figure displays a relationship between population and GDP per Cap for the top 35 most popululous countries. The y-axis displays the countries rank-ordered from most populated (China, at the top), to #35 (Canada, at the bottom). The x-axis displays the actual population of each country. I chose not to log the population values so the difference in population between the top 5 countries was not minimized. The color scale indicates GdpPerCap: Lighter colors (yellow to green) indicate a higher GdpPerCap, while darker colors (blue to purple) indicate a lower GdpPerCap.
+
+The United States and Japan stand out as the only 2 countries in the top 10 with much higher relative GDPperCaps, as clearly highlighted in yellow. China and India dwarf the next countries in size. Germany also has a relatively high GdpPerCap compared to other countries similar in population, highlighted in green. 
+
+-------------------------------------------------------------------------------
+
+### Infant Mortality Ranks
+
+```{r infmort_bypop, echo=FALSE, warning=FALSE}
+
+# created subset of data to make graph more readable
+infmort <- (gapminder_df %>%
+  filter(year == 2009) %>% 
+  arrange(desc(infant_mortality)) %>% 
+  slice(1:35))
+
+ggplot(data = infmort) +
+  aes(x = reorder(country, infant_mortality), 
+      y = infant_mortality,
+      fill = population
+      ) +
+  scale_fill_continuous("Population", type = "viridis") +
+  labs(title = "Countries by Infant Mortality Rate, 2009", 
+       x = "Country",
+       y = "Infant Mortality Rate, (deaths per 1000 births) "
+       ) +
+  
+  geom_bar(stat = "identity") +
+  coord_flip() 
+  
+  
+   
+```
+
+The above figure displays a relationship between infant mortality rate and population for the 35 countries with the highest infant mortality rates. The y-axis displays the countries rank-ordered from most highest infant mortality rate (Angola, at the top), to #35 (Uganda, at the bottom). The x-axis displays the actual infant mortality rates for each country. The color scale indicates Population: Lighter colors (yellow to green) indicate countries with larger populations, while darker colors (blue to purple) indicate countries with smaller populations.
+
+Nigeria and Pakistan clearly stand out as countries with much higher populations relative to other countries with top infant mortality rates. This could be due to poor vaccination policies and public health initiatives. Cultural and/or religious pressures could play specific roles in these two countries. Most countries with the highest infant mortality rates are located in Africa, with only a few exceptions: Pakistan, Haiti, and Laos.
